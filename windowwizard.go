@@ -409,26 +409,21 @@ func isInterestingWindow(hwnd uintptr) bool {
 	if vis == 0 {
 		return false
 	}
-
+	
 	// Root owner (closer to Alt+Tab behavior)
 	root, _, _ := procGetAncestor.Call(hwnd, GA_ROOTOWNER)
 	if root != hwnd {
 		return false
 	}
-
+	
 	// Extended styles
 	exStyle := getWindowExStyle(hwnd)
-
+	
 	// Skip tool windows (floating palettes, etc.)
 	if exStyle&WS_EX_TOOLWINDOW != 0 {
 		return false
 	}
-
-	// Optional extra strictness:
-	// if exStyle&WS_EX_APPWINDOW == 0 {
-	//     return false
-	// }
-
+	
 	// Filter out known shell windows (taskbar / Start menu hosts)
 	class := getWindowClass(hwnd)
 	switch class {
@@ -438,13 +433,13 @@ func isInterestingWindow(hwnd uintptr) bool {
 		"Windows.UI.Core.CoreWindow": // modern Start menu / UWP shell
 		return false
 	}
-
+	
 	// Must have a non-empty title
 	title := getWindowTitle(hwnd)
 	if len(title) == 0 {
 		return false
 	}
-
+	
 	return true
 }
 
@@ -510,7 +505,6 @@ func tryToSetActive(hwnd uintptr) {
 	}
 }
 
-// WinEventProc callback: all params as uintptr for syscall.NewCallback
 func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime uintptr) uintptr {
 	// Only actual window objects
 	if int32(idObject) != OBJID_WINDOW { return 0 }
@@ -519,10 +513,11 @@ func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread,
 
 	ev := uint32(event)
 	
-	if t, ok := suppressed[hwnd]; ok {
+	t, ok := suppressed[hwnd];
+	if ev != EVENT_SYSTEM_FOREGROUND && ok {
 		if time.Since(t) < suppressionWindow {
 			// ignore artificial events
-			fmt.Println("SUPPRESS:", hwnd, event)
+//			fmt.Println("SUPPRESS:", hwnd, event)
 			return 0
 		}
 		delete(suppressed, hwnd) // cleanup
@@ -671,8 +666,6 @@ func getNewActive(tree *treeNode) uintptr {
 }
 
 func windowDeleted(hwnd uintptr) bool {
-	println("Window Deleted", getWindowTitle(hwnd))
-	
 	foundit := false;
 	
 	for wi := range data {
@@ -697,8 +690,6 @@ func windowDeleted(hwnd uintptr) bool {
 }
 
 func locate() {
-	println("LOCATE")
-	
 	makingChanges = true
 	
 	for m_idx, wss := range(data) {
@@ -708,10 +699,6 @@ func locate() {
 		}
 		
 		drawTree(&wss.trees[wss.activeWorkspace], rct.Left, rct.Top, rct.Right-rct.Left, rct.Bottom-rct.Top)
-		
-		fmt.Println("\n/// Monitor print ///")
-		printTree(&wss.trees[wss.activeWorkspace], 1);
-		fmt.Println("/// Done Print ///\n")
 	}
 	
 	makingChanges = false
