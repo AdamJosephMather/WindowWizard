@@ -790,19 +790,54 @@ func toggleSlice(hwnd uintptr) {
 				continue
 			}
 			
-			makingChanges = true
+			node.splitHorz = !node.splitHorz
 			
-			new := !node.splitHorz
-			windowDeleted(hwnd)
-			if new {
-				addToTree(hwnd, tree, wss.activeNodes[ti], 1)
-			}else{
-				addToTree(hwnd, tree, wss.activeNodes[ti], 0)
+			toEdit := make([]*treeNode, 0)
+			
+			for _,c := range(node.children) {
+				c_nd, ok := c.(*treeNode)
+				if ok {
+					if (c_nd.splitHorz == node.splitHorz) {
+						toEdit = append(toEdit, c_nd)
+					}
+				}
+			}
+			
+			for _,edt := range(toEdit) {
+				for i,c := range(node.children) {
+					if c == edt {
+						node.children = slices.Delete(node.children, i, i+1)
+						break
+					}
+				}
+				
+				for _,c := range(edt.children) {
+					node.children = append(node.children, c)
+					c_nd,ok := c.(*treeNode)
+					if ok {
+						c_nd.parent = node
+					}
+				}
+			}
+			
+			if node.parent != nil && node.parent.splitHorz == node.splitHorz {
+				for i,c := range node.parent.children {
+					if c == node {
+						node.parent.children = slices.Delete(node.parent.children, i, i+1)
+						
+						for _,c := range(node.children) {
+							node.parent.children = append(node.parent.children, c)
+							c_nd,ok := c.(*treeNode)
+							if ok {
+								c_nd.parent = node.parent
+							}
+						}
+					}
+				}
 			}
 			
 			locate()
 			
-			makingChanges = false
 			return
 		}
 	}
@@ -974,9 +1009,13 @@ func restoreTree(tree *treeNode) {
 func switchWorkspace(wi int) {
 	println("Switching workspace: ", wi)
 	
-	makingChanges = true
-	
 	old := data[curMon].activeWorkspace
+	
+	if old == wi {
+		return;
+	}
+	
+	makingChanges = true
 	
 	minimizeTree(&data[curMon].trees[old])
 	data[curMon].activeWorkspace = wi
