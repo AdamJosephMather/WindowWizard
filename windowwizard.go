@@ -290,7 +290,6 @@ func overlayWndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 			brush,
 		)
 
-		// 2) Draw the visible border in red (different color than the key)
 		pen, _, _ := procCreatePen.Call(
 			0,          // PS_SOLID
 			2,          // width
@@ -761,6 +760,7 @@ func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread,
 	t, ok := suppressed[hwnd];
 	if ev != EVENT_SYSTEM_FOREGROUND && ev != EVENT_OBJECT_LOCATIONCHANGE && ok {
 		if time.Since(t) < suppressionWindow {
+			println("SUPPRESS : ", getWindowTitle(hwnd))
 			return 0
 		}
 		delete(suppressed, hwnd) // cleanup
@@ -1107,50 +1107,73 @@ func nextMonitor(hwnd uintptr) {
 	locate()
 }
 
-func switchWindows(a, b uintptr) {
-	var ati *treeNode = nil
-	var bti *treeNode = nil
+func swapWindows(a, b uintptr) {
+	var a_tn *treeNode = nil
+	var b_tn *treeNode = nil
 	
 	for i := range data {
 		wws := &data[i]
 		for ti := range wws.trees {
 			tree := &wws.trees[ti]
 			
-			if ati == nil {
-				ati = isInTree(a, tree)
+			if a_tn == nil {
+				a_tn = isInTree(a, tree)
+				if a_tn != nil {
+					if i != curMon && ti != wws.activeWorkspace {
+						minimizeWindow(a)
+					}else {
+						restoreWindow(a)
+					}
+				}
 			}
-			if bti == nil {
-				bti = isInTree(b, tree)
+			if b_tn == nil {
+				b_tn = isInTree(b, tree)
+				
+				if b_tn != nil {
+					if i != curMon && ti != wws.activeWorkspace {
+						minimizeWindow(b)
+					}else {
+						restoreWindow(b)
+					}
+				}
 			}
 			
-			if bti != nil && ati != nil {
+			if b_tn != nil && a_tn != nil {
 				break
 			}
 		}
-		if bti != nil && ati != nil {
+		if b_tn != nil && a_tn != nil {
 			break
 		}
 	}
 	
-	if ati == nil || bti == nil {
+	if a_tn == nil || b_tn == nil {
 		return
 	}
 	
-	for i,c := range ati.children {
+	a_indx := -1
+	b_indx := -1
+	for i,c := range a_tn.children {
 		c_hwnd,ok := c.(uintptr)
 		if !ok {continue}
 		if c_hwnd != a { continue }
-		
-		for j,c2 := range bti.children {
-			c2_hwnd,ok := c2.(uintptr)
-			if !ok {continue}
-			if c2_hwnd != b { continue }
-			
-			ati.children[i] = b
-			bti.children[j] = a
-			locate()
-		}
+		a_indx = i
 	}
+	
+	for i,c := range b_tn.children {
+		c2_hwnd,ok := c.(uintptr)
+		if !ok {continue}
+		if c2_hwnd != b { continue }
+		b_indx = i;
+	}
+	
+	if a_indx == -1 || b_indx == -1 {
+		return
+	}
+	
+	a_tn.children[a_indx] = b
+	b_tn.children[b_indx] = a
+	locate()
 }
 
 func moveWindowToWorkspace(hwnd uintptr, wi int) {
@@ -1210,7 +1233,7 @@ func keyboardCallback(nCode int, wParam uintptr, lParam uintptr) uintptr {
 				if nd == 0 { return 1 }
 				
 				if isShift {
-					switchWindows(hwnd, nd)
+					swapWindows(hwnd, nd)
 				}else{
 					setForeground(nd)
 				}
@@ -1220,7 +1243,7 @@ func keyboardCallback(nCode int, wParam uintptr, lParam uintptr) uintptr {
 				nd := getNodeTo(hwnd, DIR_DOWN)
 				if nd == 0 { return 1 }
 				if isShift {
-					switchWindows(hwnd, nd)
+					swapWindows(hwnd, nd)
 				}else{
 					setForeground(nd)
 				}
@@ -1230,7 +1253,7 @@ func keyboardCallback(nCode int, wParam uintptr, lParam uintptr) uintptr {
 				nd := getNodeTo(hwnd, DIR_UP)
 				if nd == 0 { return 1 }
 				if isShift {
-					switchWindows(hwnd, nd)
+					swapWindows(hwnd, nd)
 				}else{
 					setForeground(nd)
 				}
@@ -1240,7 +1263,7 @@ func keyboardCallback(nCode int, wParam uintptr, lParam uintptr) uintptr {
 				nd := getNodeTo(hwnd, DIR_RIGHT)
 				if nd == 0 { return 1 }
 				if isShift {
-					switchWindows(hwnd, nd)
+					swapWindows(hwnd, nd)
 				}else{
 					setForeground(nd)
 				}
