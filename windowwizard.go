@@ -139,6 +139,8 @@ const (
 	DWMWA_EXTENDED_FRAME_BOUNDS = 9
 )
 
+var BORDER_WIDTH int32 = 3
+
 var suppressed = map[uintptr]time.Time{}
 const suppressionWindow = 500 * time.Millisecond
 
@@ -762,7 +764,7 @@ func locate() {
 			rct.Bottom -= taskbar_heights[m_idx]
 		}
 		
-		drawTree(&wss.trees[wss.activeWorkspace], rct.Left, rct.Top, rct.Right-rct.Left, rct.Bottom-rct.Top)
+		drawTree(&wss.trees[wss.activeWorkspace], rct.Left+BORDER_WIDTH, rct.Top+BORDER_WIDTH, rct.Right-rct.Left-BORDER_WIDTH*2, rct.Bottom-rct.Top-BORDER_WIDTH*2)
 	}
 	
 	makingChanges = false
@@ -792,7 +794,7 @@ func drawTree(tree *treeNode, x, y, w, h int32) {
 		hwnd, ok := c.(uintptr)
 		if (ok) {
 			restoreWindow(hwnd)
-			moveResizeWindow(hwnd, cx, cy, cw, ch);
+			moveResizeWindow(hwnd, cx+BORDER_WIDTH, cy+BORDER_WIDTH, cw-BORDER_WIDTH*2, ch-BORDER_WIDTH*2);
 		}
 		nd, ok := c.(*treeNode)
 		if (ok) {
