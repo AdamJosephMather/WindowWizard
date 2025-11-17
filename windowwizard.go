@@ -76,6 +76,7 @@ const (
 	WS_EX_TOOLWINDOW     = 0x00000080
 	WS_EX_APPWINDOW      = 0x00040000
 
+	EVENT_SYSTEM_DISPLAYCHANGE  = 0x000A
 	EVENT_OBJECT_CREATE         = 0x8000
 	EVENT_OBJECT_DESTROY        = 0x8001
 	EVENT_OBJECT_SHOW           = 0x8002
@@ -556,12 +557,19 @@ func tryToSetActive(hwnd uintptr) {
 }
 
 func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime uintptr) uintptr {
+
+	ev := uint32(event)
+	if ev == EVENT_SYSTEM_DISPLAYCHANGE {
+		onMonitorsChanged()
+		return 0
+	}
+	
 	// Only actual window objects
 	if int32(idObject) != OBJID_WINDOW { return 0 }
 	
 	if makingChanges { return 0; }
 
-	ev := uint32(event)
+	
 	
 	t, ok := suppressed[hwnd];
 	if ev != EVENT_SYSTEM_FOREGROUND && ok {
@@ -948,7 +956,6 @@ func switchWindows(a, b uintptr) {
 			ati.children[i] = b
 			bti.children[j] = a
 			locate()
-			return
 		}
 	}
 }
@@ -1250,6 +1257,45 @@ func callNextHookEx(nCode int, wParam uintptr, lParam uintptr) uintptr {
 	return ret
 }
 
+func onMonitorsChanged() {
+	fmt.Println("Display configuration changed, re-enumerating monitors...")
+	
+	makingChanges = true
+	for _,wss := range data {
+		for _,tree := range wss.trees {
+			minimizeTree(&tree)
+		}
+	}
+	makingChanges = false
+	
+	ms := enumDisplayMonitors()
+	
+	if len(ms) == 0 {
+		panic("0 Monitors Detected. ABORT")
+	}
+	
+	data = make([]workSpaces, 0)
+	curMon = 0
+
+	for i, m := range ms {
+		fmt.Printf("Monitor %d: %+v\n", i, m.RcMonitor)
+
+		ws := workSpaces{}
+		ws.trees = make([]treeNode, 10)
+		ws.activeNodes = make([]uintptr, 10)
+		ws.activeWorkspace = 0
+		
+		data = append(data, ws)
+	}
+	
+	if len(data) == 0 {
+		fmt.Println("No monitors after change, nothing to do")
+		return
+	}
+	
+	locate()
+}
+
 func main() {
 	ms := enumDisplayMonitors()
 	curMon = 0
@@ -1292,10 +1338,12 @@ func main() {
 		
 		fmt.Println("Open  - ", title)
 		
-		wss := data[curMon]
-		addToTree(hwnd, &wss.trees[wss.activeWorkspace], wss.activeNodes[wss.activeWorkspace], 2)
-		wss.activeNodes[wss.activeWorkspace] = hwnd
-		setForeground(hwnd)
+		minimizeWindow(hwnd)
+		
+//		wss := data[curMon]
+//		addToTree(hwnd, &wss.trees[wss.activeWorkspace], wss.activeNodes[wss.activeWorkspace], 2)
+//		wss.activeNodes[wss.activeWorkspace] = hwnd
+		
 		
 		return 1
 	})
