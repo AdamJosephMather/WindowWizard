@@ -76,7 +76,7 @@ const (
 	WS_EX_TOOLWINDOW     = 0x00000080
 	WS_EX_APPWINDOW      = 0x00040000
 
-	EVENT_SYSTEM_DISPLAYCHANGE  = 0x000A
+	EVENT_SYSTEM_DISPLAYCHANGE  = 0x007E
 	EVENT_OBJECT_CREATE         = 0x8000
 	EVENT_OBJECT_DESTROY        = 0x8001
 	EVENT_OBJECT_SHOW           = 0x8002
@@ -562,7 +562,6 @@ func tryToSetActive(hwnd uintptr) {
 }
 
 func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime uintptr) uintptr {
-
 	ev := uint32(event)
 	if ev == EVENT_SYSTEM_DISPLAYCHANGE {
 		onMonitorsChanged()
