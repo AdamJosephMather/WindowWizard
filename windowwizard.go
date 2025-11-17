@@ -54,7 +54,8 @@ var (
 	procIsIconic = user32.NewProc("IsIconic")
 	
 	dwmapi  = windows.NewLazySystemDLL("dwmapi.dll")
-	procDwmGetWindowAttribute = dwmapi.NewProc("DwmGetWindowAttribute") //
+	procDwmGetWindowAttribute = dwmapi.NewProc("DwmGetWindowAttribute")
+	procSetForegroundWindow             = user32.NewProc("SetForegroundWindow")
 )
 
 const (
@@ -208,6 +209,10 @@ var data []workSpaces
 var taskbar_heights []int32
 var monitors []MONITORINFO
 var makingChanges bool = false
+
+func setForeground(hwnd uintptr) {
+	procSetForegroundWindow.Call(uintptr(hwnd))
+}
 
 func getExtendedFrameBounds(hwnd uintptr) (RECT, bool) {
 	var r RECT
@@ -499,6 +504,7 @@ func tryToSetActive(hwnd uintptr) {
 			if isInTree(hwnd, &tree) != nil {
 				wss.activeNodes[j] = hwnd
 				curMon = mi
+				setForeground(hwnd)
 				return
 			}
 		}
@@ -536,7 +542,6 @@ func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread,
 		wss := data[curMon]
 		aw := wss.activeWorkspace
 		addToTree(hwnd, &wss.trees[aw], wss.activeNodes[aw], 2)
-		
 		locate()
 	} else if (ev == EVENT_OBJECT_LOCATIONCHANGE) {
 		
@@ -680,6 +685,9 @@ func windowDeleted(hwnd uintptr) bool {
 				// We found and removed it in this tree
 				if wss.activeNodes[ti] == hwnd {
 					wss.activeNodes[ti] = getNewActive(tree)
+					if (ti == curMon) {
+						setForeground(wss.activeNodes[ti])
+					}
 				}
 				break // no need to keep searching this workspace
 			}
@@ -811,9 +819,11 @@ func nextMonitor(hwnd uintptr) {
 	}
 	
 	curMon = (curMon + 1) % len(data)
+	data[curMon].activeNodes[data[curMon].activeWorkspace] = hwnd
 	
 	windowDeleted(hwnd)
 	addToTree(hwnd, &data[curMon].trees[data[curMon].activeWorkspace], data[curMon].activeNodes[data[curMon].activeWorkspace], 2)
+	setForeground(hwnd)
 	locate()
 }
 
@@ -1028,8 +1038,9 @@ func main() {
 		wss := data[curMon]
 		addToTree(hwnd, &wss.trees[wss.activeWorkspace], wss.activeNodes[wss.activeWorkspace], 2)
 		wss.activeNodes[wss.activeWorkspace] = hwnd
+		setForeground(hwnd)
 		
-		return 1 // continue enumeration
+		return 1
 	})
 	
 	procEnumWindows.Call(cb1, 0)
