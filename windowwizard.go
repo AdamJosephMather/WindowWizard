@@ -66,6 +66,33 @@ var (
 	procBringWindowToTop          = user32.NewProc("BringWindowToTop")
 	procShowWindowAsync           = user32.NewProc("ShowWindowAsync")
 	procGetCurrentThreadId        = kernel32.NewProc("GetCurrentThreadId")
+	
+	procRegisterClassExW      = user32.NewProc("RegisterClassExW")
+	procCreateWindowExW       = user32.NewProc("CreateWindowExW")
+	procDefWindowProcW        = user32.NewProc("DefWindowProcW")
+	procUpdateWindow          = user32.NewProc("UpdateWindow")
+	procSetLayeredWindowAttrs = user32.NewProc("SetLayeredWindowAttributes")
+	procGetSystemMetrics      = user32.NewProc("GetSystemMetrics")
+	
+	procGetModuleHandleW      = kernel32.NewProc("GetModuleHandleW")
+	
+	
+	gdi32   = windows.NewLazySystemDLL("gdi32.dll")
+	
+	procPostQuitMessage    = user32.NewProc("PostQuitMessage")
+	procSetLayeredWindowAttributes = user32.NewProc("SetLayeredWindowAttributes")
+	procBeginPaint         = user32.NewProc("BeginPaint")
+	procEndPaint           = user32.NewProc("EndPaint")
+
+	procCreatePen          = gdi32.NewProc("CreatePen")
+	procSelectObject       = gdi32.NewProc("SelectObject")
+	procMoveToEx           = gdi32.NewProc("MoveToEx")
+	procLineTo             = gdi32.NewProc("LineTo")
+	procDeleteObject       = gdi32.NewProc("DeleteObject")
+	
+	procInvalidateRect = user32.NewProc("InvalidateRect")
+	procCreateSolidBrush = gdi32.NewProc("CreateSolidBrush")
+	procFillRect         = user32.NewProc("FillRect")
 )
 
 const (
@@ -137,7 +164,163 @@ const (
 	
 	OBJID_WINDOW         = 0
 	DWMWA_EXTENDED_FRAME_BOUNDS = 9
+	
+	// Window styles
+	// Layered window flags
+	LWA_COLORKEY = 0x00000001
+	
+	// System metrics
+	WS_POPUP = 0x80000000
+
+	// Extended styles
+	WS_EX_TOPMOST     = 0x00000008
+	WS_EX_LAYERED     = 0x00080000
+	WS_EX_TRANSPARENT = 0x00000020
+
+	// ShowWindow
+	SW_SHOW = 5
+
+	// Layered window
+	colorKeyMagenta = 0x00FF00FF
+	// LWA_ALPHA   = 0x00000002  // still exists if you need it later
+
+	// System metrics
+	SM_XVIRTUALSCREEN  = 76
+	SM_YVIRTUALSCREEN  = 77
+	SM_CXVIRTUALSCREEN = 78
+	SM_CYVIRTUALSCREEN = 79
+
+	// Messages
+	WM_PAINT   = 0x000F
+	WM_DESTROY = 0x0002
 )
+
+type WNDCLASSEX struct {
+	Size       uint32
+	Style      uint32
+	WndProc    uintptr
+	ClsExtra   int32
+	WndExtra   int32
+	Instance   windows.Handle
+	Icon       windows.Handle
+	Cursor     windows.Handle
+	Background windows.Handle
+	MenuName   *uint16
+	ClassName  *uint16
+	IconSm     windows.Handle
+}
+
+type PAINTSTRUCT struct {
+	Hdc         windows.Handle
+	Erase       int32
+	RcPaint     RECT
+	Restore     int32
+	IncUpdate   int32
+	RgbReserved [32]byte
+}
+
+var overlayHWND windows.Handle
+
+
+func invalidateOverlay() {
+	if overlayHWND == 0 {
+		return
+	}
+	// BOOL InvalidateRect(HWND hWnd, const RECT *lpRect, BOOL bErase);
+	procInvalidateRect.Call(
+		uintptr(overlayHWND),
+		0,      // nil RECT => whole window
+		1,      // erase background (TRUE) – fine for our case
+	)
+}
+
+func getHInstance() windows.Handle {
+	h, _, _ := procGetModuleHandleW.Call(0)
+	return windows.Handle(h)
+}
+
+func getSystemMetric(idx int32) int32 {
+	ret, _, _ := procGetSystemMetrics.Call(uintptr(idx))
+	return int32(ret)
+}
+
+var trackingHWND uintptr = 0
+
+func overlayWndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
+	switch msg {
+	case WM_PAINT:
+		println("Paint")
+		
+		var ps PAINTSTRUCT
+		hdc, _, _ := procBeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+		
+		if trackingHWND == 0 {
+			procEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+			return 0
+		}
+		
+		// Get client rectangle
+//		var rc RECT
+//		procGetClientRect.Call(trackingHWND, uintptr(unsafe.Pointer(&rc)))
+		
+		var rc RECT // l, t, r, b
+		procGetWindowRect.Call(trackingHWND, uintptr(unsafe.Pointer(&rc)))
+		
+		var r2 RECT // this is 0, 0, w, h
+		procGetClientRect.Call(trackingHWND, uintptr(unsafe.Pointer(&r2)))
+		
+		r1_w := rc.Right-rc.Left
+		r1_h := rc.Bottom-rc.Top
+		
+		r2_w := r2.Right
+		r2_h := r2.Bottom
+		
+		rc.Left += (r1_w-r2_w)/2
+		rc.Right -= (r1_w-r2_w)/2
+		rc.Bottom -= r1_h-r2_h
+		
+		var fill RECT
+		procGetClientRect.Call(uintptr(overlayHWND), uintptr(unsafe.Pointer(&fill)))
+
+		// 1) Fill the area with the color-key color (magenta)
+		brush, _, _ := procCreateSolidBrush.Call(colorKeyMagenta)
+		procFillRect.Call(
+			hdc,
+			uintptr(unsafe.Pointer(&fill)),
+			brush,
+		)
+
+		// 2) Draw the visible border in red (different color than the key)
+		pen, _, _ := procCreatePen.Call(
+			0,          // PS_SOLID
+			2,          // width
+			0x00FC9403, // red (0x00BBGGRR)
+		)
+		oldPen, _, _ := procSelectObject.Call(hdc, pen)
+
+		procMoveToEx.Call(hdc, uintptr(rc.Left), uintptr(rc.Top), 0)
+		procLineTo.Call(hdc, uintptr(rc.Right-1), uintptr(rc.Top))
+		procLineTo.Call(hdc, uintptr(rc.Right-1), uintptr(rc.Bottom-1))
+		procLineTo.Call(hdc, uintptr(rc.Left), uintptr(rc.Bottom-1))
+		procLineTo.Call(hdc, uintptr(rc.Left), uintptr(rc.Top))
+
+		procSelectObject.Call(hdc, oldPen)
+		procDeleteObject.Call(pen)
+		procDeleteObject.Call(brush)
+
+		procEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+		return 0
+
+	case WM_DESTROY:
+		procPostQuitMessage.Call(0)
+		return 0
+	}
+
+	// Default handling
+	ret, _, _ := procDefWindowProcW.Call(hwnd, uintptr(msg), wparam, lparam)
+	return ret
+}
+
 
 var BORDER_WIDTH int32 = 3
 
@@ -224,12 +407,10 @@ var monitors []MONITORINFO
 var makingChanges bool = false
 
 func setForeground(hwnd uintptr) {
-	println("SF")
-	
 	if hwnd == 0 {
 		return
 	}
-
+	
 	// If minimized, restore; otherwise ensure it's shown.
 	isIconic, _, _ := procIsIconic.Call(hwnd)
 	if isIconic != 0 {
@@ -261,6 +442,9 @@ func setForeground(hwnd uintptr) {
 	if fgThread != 0 && curThread != 0 {
 		procAttachThreadInput.Call(curThread, fgThread, 0) // detach
 	}
+	
+	trackingHWND = hwnd
+	invalidateOverlay()
 }
 
 func getExtendedFrameBounds(hwnd uintptr) (RECT, bool) {
@@ -548,13 +732,14 @@ func isInTree(hwnd uintptr, tree *treeNode) *treeNode {
 }
 
 func tryToSetActive(hwnd uintptr) {
-	println("TTSA")
-	
 	for mi, wss := range(data) {
 		for j, tree := range(wss.trees) {
 			if isInTree(hwnd, &tree) != nil {
 				wss.activeNodes[j] = hwnd
+				wss.activeWorkspace = j
 				curMon = mi
+				trackingHWND = hwnd
+				invalidateOverlay()
 				return
 			}
 		}
@@ -571,15 +756,11 @@ func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread,
 	// Only actual window objects
 	if int32(idObject) != OBJID_WINDOW { return 0 }
 	
-	if makingChanges { return 0; }
-
-	
+	if makingChanges && ev != EVENT_SYSTEM_FOREGROUND && ev != EVENT_OBJECT_LOCATIONCHANGE { return 0; }
 	
 	t, ok := suppressed[hwnd];
-	if ev != EVENT_SYSTEM_FOREGROUND && ok {
+	if ev != EVENT_SYSTEM_FOREGROUND && ev != EVENT_OBJECT_LOCATIONCHANGE && ok {
 		if time.Since(t) < suppressionWindow {
-			// ignore artificial events
-//			fmt.Println("SUPPRESS:", hwnd, event)
 			return 0
 		}
 		delete(suppressed, hwnd) // cleanup
@@ -598,9 +779,13 @@ func eventCallback(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread,
 		wss := data[curMon]
 		aw := wss.activeWorkspace
 		addToTree(hwnd, &wss.trees[aw], wss.activeNodes[aw], 2)
+		tryToSetActive(hwnd)
+		
 		locate()
 	} else if (ev == EVENT_OBJECT_LOCATIONCHANGE) {
-		
+		if trackingHWND == hwnd {
+			invalidateOverlay()
+		}
 	}else if (ev == EVENT_OBJECT_HIDE || ev == EVENT_SYSTEM_MINIMIZESTART) {
 		title := getWindowTitle(hwnd)
 		fmt.Println("Close - ", title)
@@ -742,7 +927,6 @@ func windowDeleted(hwnd uintptr) bool {
 				if wss.activeNodes[ti] == hwnd {
 					wss.activeNodes[ti] = getNewActive(tree)
 					if (ti == curMon) {
-						println("WD")
 						setForeground(wss.activeNodes[ti])
 					}
 				}
@@ -912,6 +1096,8 @@ func nextMonitor(hwnd uintptr) {
 	
 	curMon = (curMon + 1) % len(data)
 	data[curMon].activeNodes[data[curMon].activeWorkspace] = hwnd
+	trackingHWND = hwnd
+	invalidateOverlay()
 	
 	windowDeleted(hwnd)
 	addToTree(hwnd, &data[curMon].trees[data[curMon].activeWorkspace], data[curMon].activeNodes[data[curMon].activeWorkspace], 2)
@@ -1364,7 +1550,58 @@ func onMonitorsChanged() {
 	locate()
 }
 
+func setupOverlay() {
+	instance := getHInstance()
+
+	className, _ := syscall.UTF16PtrFromString("OverlayWindowClass")
+
+	wndClass := WNDCLASSEX{
+		Size:     uint32(unsafe.Sizeof(WNDCLASSEX{})),
+		WndProc:  syscall.NewCallback(overlayWndProc),
+		Instance: instance,
+		ClassName: className,
+	}
+
+	procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wndClass)))
+
+	// Cover the virtual screen (all monitors)
+	x := getSystemMetric(SM_XVIRTUALSCREEN)
+	y := getSystemMetric(SM_YVIRTUALSCREEN)
+	w := getSystemMetric(SM_CXVIRTUALSCREEN)
+	h := getSystemMetric(SM_CYVIRTUALSCREEN)
+
+	extStyle := WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_TRANSPARENT
+
+	hwndRaw, _, _ := procCreateWindowExW.Call(
+		uintptr(extStyle),
+		uintptr(unsafe.Pointer(className)),
+		0, // no title
+		uintptr(WS_POPUP),
+		uintptr(x),
+		uintptr(y),
+		uintptr(w),
+		uintptr(h),
+		0, 0, uintptr(instance), 0,
+	)
+	overlayHWND = windows.Handle(hwndRaw)
+
+	// Make the overlay fully opaque (from DWM's point of view),
+	// but still click-through because of WS_EX_TRANSPARENT.
+	// Make this color fully transparent
+	procSetLayeredWindowAttributes.Call(
+		uintptr(overlayHWND),
+		uintptr(colorKeyMagenta), // transparent color
+		0,                        // alpha (ignored when using COLORKEY only)
+		LWA_COLORKEY,
+	)
+
+	procShowWindow.Call(uintptr(overlayHWND), SW_SHOW)
+	procUpdateWindow.Call(uintptr(overlayHWND))
+}
+
 func main() {
+	setupOverlay()
+	
 	ms := enumDisplayMonitors()
 	curMon = 0
 	for i, m := range ms {
@@ -1407,11 +1644,6 @@ func main() {
 		fmt.Println("Open  - ", title)
 		
 		minimizeWindow(hwnd)
-		
-//		wss := data[curMon]
-//		addToTree(hwnd, &wss.trees[wss.activeWorkspace], wss.activeNodes[wss.activeWorkspace], 2)
-//		wss.activeNodes[wss.activeWorkspace] = hwnd
-		
 		
 		return 1
 	})
