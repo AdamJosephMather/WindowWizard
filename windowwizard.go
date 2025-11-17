@@ -55,7 +55,17 @@ var (
 	
 	dwmapi  = windows.NewLazySystemDLL("dwmapi.dll")
 	procDwmGetWindowAttribute = dwmapi.NewProc("DwmGetWindowAttribute")
-	procSetForegroundWindow             = user32.NewProc("SetForegroundWindow")
+	procSetForegroundWindow   = user32.NewProc("SetForegroundWindow")
+	kernel32 = windows.NewLazySystemDLL("kernel32.dll")
+	
+	procGetForegroundWindow       = user32.NewProc("GetForegroundWindow")
+	procGetWindowThreadProcessId  = user32.NewProc("GetWindowThreadProcessId")
+	procAttachThreadInput         = user32.NewProc("AttachThreadInput")
+	procSetActiveWindow           = user32.NewProc("SetActiveWindow")
+	procSetFocus                  = user32.NewProc("SetFocus")
+	procBringWindowToTop          = user32.NewProc("BringWindowToTop")
+	procShowWindowAsync           = user32.NewProc("ShowWindowAsync")
+	procGetCurrentThreadId        = kernel32.NewProc("GetCurrentThreadId")
 )
 
 const (
@@ -211,7 +221,41 @@ var monitors []MONITORINFO
 var makingChanges bool = false
 
 func setForeground(hwnd uintptr) {
-	procSetForegroundWindow.Call(uintptr(hwnd))
+	if hwnd == 0 {
+		return
+	}
+
+	// If minimized, restore; otherwise ensure it's shown.
+	isIconic, _, _ := procIsIconic.Call(hwnd)
+	if isIconic != 0 {
+		procShowWindowAsync.Call(hwnd, SW_RESTORE)
+	} else {
+		procShowWindowAsync.Call(hwnd, SW_SHOWNORMAL)
+	}
+
+	// Get current foreground window & thread
+	fg, _, _ := procGetForegroundWindow.Call()
+	var dummyPID uint32
+	fgThread, _, _ := procGetWindowThreadProcessId.Call(fg, uintptr(unsafe.Pointer(&dummyPID)))
+
+	// Get our current thread id
+	curThread, _, _ := procGetCurrentThreadId.Call()
+
+	// Temporarily attach our input queue to the foreground thread
+	if fgThread != 0 && curThread != 0 {
+		procAttachThreadInput.Call(curThread, fgThread, 1) // attach
+	}
+
+	// Bring/activate/focus the target
+	procBringWindowToTop.Call(hwnd)
+	procSetForegroundWindow.Call(hwnd)
+	procSetActiveWindow.Call(hwnd)
+	procSetFocus.Call(hwnd)
+
+	// Detach again
+	if fgThread != 0 && curThread != 0 {
+		procAttachThreadInput.Call(curThread, fgThread, 0) // detach
+	}
 }
 
 func getExtendedFrameBounds(hwnd uintptr) (RECT, bool) {
@@ -862,6 +906,53 @@ func nextMonitor(hwnd uintptr) {
 	locate()
 }
 
+func switchWindows(a, b uintptr) {
+	var ati *treeNode = nil
+	var bti *treeNode = nil
+	
+	for i := range data {
+		wws := &data[i]
+		for ti := range wws.trees {
+			tree := &wws.trees[ti]
+			
+			if ati == nil {
+				ati = isInTree(a, tree)
+			}
+			if bti == nil {
+				bti = isInTree(b, tree)
+			}
+			
+			if bti != nil && ati != nil {
+				break
+			}
+		}
+		if bti != nil && ati != nil {
+			break
+		}
+	}
+	
+	if ati == nil || bti == nil {
+		return
+	}
+	
+	for i,c := range ati.children {
+		c_hwnd,ok := c.(uintptr)
+		if !ok {continue}
+		if c_hwnd != a { continue }
+		
+		for j,c2 := range bti.children {
+			c2_hwnd,ok := c2.(uintptr)
+			if !ok {continue}
+			if c2_hwnd != b { continue }
+			
+			ati.children[i] = b
+			bti.children[j] = a
+			locate()
+			return
+		}
+	}
+}
+
 // Helper to check if a key is currently pressed down
 func isKeyDown(vkCode uintptr) bool {
 	// GetAsyncKeyState's high bit is set if the key is down.
@@ -887,51 +978,63 @@ func keyboardCallback(nCode int, wParam uintptr, lParam uintptr) uintptr {
 		if isKeyDown(VK_RMENU) {
 			
 			// Check if Shift is also held down (either L or R)
-//			isShift := isKeyDown(VK_LSHIFT) || isKeyDown(VK_RSHIFT)
-
+			isShift := isKeyDown(VK_LSHIFT) || isKeyDown(VK_RSHIFT)
+			
+			hwnd := data[curMon].activeNodes[data[curMon].activeWorkspace];
+			
 			switch vkCode {
 			case VK_H:
-//				if isShift {
-//					fmt.Println("HOTKEY: RAlt + Shift + H")
-//				} else {
-//					fmt.Println("HOTKEY: RAlt + H")
-//				}
+				if hwnd == 0 { return 1 }
+				nd := getNodeTo(hwnd, DIR_LEFT)
+				if nd == 0 { return 1 }
+				
+				if isShift {
+					switchWindows(hwnd, nd)
+				}else{
+					setForeground(nd)
+				}
 				return 1 // Return 1 to "swallow" the key (other apps won't see it)
 			case VK_J:
-//				if isShift {
-//					fmt.Println("HOTKEY: RAlt + Shift + J")
-//				} else {
-//					fmt.Println("HOTKEY: RAlt + J")
-//				}
+				if hwnd == 0 { return 1 }
+				nd := getNodeTo(hwnd, DIR_DOWN)
+				if nd == 0 { return 1 }
+				if isShift {
+					switchWindows(hwnd, nd)
+				}else{
+					setForeground(nd)
+				}
 				return 1
 			case VK_K:
-//				if isShift {
-//					fmt.Println("HOTKEY: RAlt + Shift + K")
-//				} else {
-//					fmt.Println("HOTKEY: RAlt + K")
-//				}
+				if hwnd == 0 { return 1 }
+				nd := getNodeTo(hwnd, DIR_UP)
+				if nd == 0 { return 1 }
+				if isShift {
+					switchWindows(hwnd, nd)
+				}else{
+					setForeground(nd)
+				}
 				return 1
 			case VK_L:
-//				if isShift {
-//					fmt.Println("HOTKEY: RAlt + Shift + L")
-//				} else {
-//					fmt.Println("HOTKEY: RAlt + L")
-//				}
+				if hwnd == 0 { return 1 }
+				nd := getNodeTo(hwnd, DIR_RIGHT)
+				if nd == 0 { return 1 }
+				if isShift {
+					switchWindows(hwnd, nd)
+				}else{
+					setForeground(nd)
+				}
 				return 1
 			case VK_M:
-				hwnd := data[curMon].activeNodes[data[curMon].activeWorkspace];
 				if hwnd != 0 {
 					nextMonitor(hwnd)
 				}
 				return 1
 			case VK_T:
-				hwnd := data[curMon].activeNodes[data[curMon].activeWorkspace];
 				if hwnd != 0 {
 					toggleSlice(hwnd)
 				}
 				return 1
 			case VK_W:
-				hwnd := data[curMon].activeNodes[data[curMon].activeWorkspace];
 				if hwnd != 0 {
 					procSendMessage.Call(
 						uintptr(hwnd),
@@ -1023,6 +1126,121 @@ func switchWorkspace(wi int) {
 	locate()
 	
 	makingChanges = false
+}
+
+type treeMap struct {
+	hwnd uintptr
+	x int
+	y int
+	w int
+	h int
+}
+
+	
+	
+	
+func mapTreeLocations(tree *treeNode, x, y, w, h int) []treeMap{
+	out := make([]treeMap, 0)
+	
+	if (len(tree.children) == 0) { return out }
+	
+	cx := x;
+	cy := y;
+	cw := w;
+	ch := h;
+	ax := 0;
+	ay := 0;
+	
+	if (tree.splitHorz) {
+		ch = h/len(tree.children)
+		ay = ch
+	}else{
+		cw = w/len(tree.children)
+		ax = cw;
+	}
+	
+	for _, c := range tree.children {
+		hwnd, ok := c.(uintptr)
+		if (ok) {
+			out = append(out, treeMap{hwnd, cx, cy, cw, ch})
+		}
+		nd, ok := c.(*treeNode)
+		if (ok) {
+			out = append(out, mapTreeLocations(nd, cx, cy, cw, ch)...)
+		}
+		
+		cx += ax
+		cy += ay
+	}
+	
+	return out
+}
+
+const (
+	DIR_LEFT = 0
+	DIR_RIGHT = 1
+	DIR_UP = 2
+	DIR_DOWN = 3
+)
+
+func _findNodeInDir(hwnd uintptr, tree *treeNode, dir int) uintptr {
+	positions := mapTreeLocations(tree, 0, 0, 200, 200)
+	
+	indx := -1
+	for i,p := range(positions) {
+		if p.hwnd == hwnd {
+			indx = i
+			break
+		}
+	}
+	if indx == -1 { return 0 }
+	
+	lc := positions[indx]
+	
+	for i,p := range(positions) {
+		if i == indx {
+			continue
+		}
+		
+		if dir == DIR_LEFT {
+			if p.x+p.w != lc.x { continue }
+			if p.y < lc.y+lc.h && lc.y < p.y+p.h {
+				return p.hwnd
+			}
+		}else if dir == DIR_RIGHT {
+			if p.x != lc.x+lc.w { continue }
+			if p.y < lc.y+lc.h && lc.y < p.y+p.h {
+				return p.hwnd
+			}
+		}else if dir == DIR_DOWN {
+			if p.y != lc.y+lc.h { continue }
+			if p.x < lc.x+lc.w && lc.x < p.x+p.w {
+				return p.hwnd
+			}
+		}else if dir == DIR_UP {
+			if p.y+p.h != lc.y { continue }
+			if p.x < lc.x+lc.w && lc.x < p.x+p.w {
+				return p.hwnd
+			}
+		}
+	}
+	
+	return 0
+}
+
+func getNodeTo(hwnd uintptr, dir int) uintptr {
+	for _,wss := range data {
+		for _,tree := range wss.trees {
+			nd := isInTree(hwnd, &tree)
+			if nd == nil {
+				continue
+			}
+			
+			return _findNodeInDir(hwnd, &tree, dir)
+		}
+	}
+	
+	return 0
 }
 
 // Helper function to call CallNextHookEx
