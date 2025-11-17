@@ -72,7 +72,7 @@ const (
 	GA_ROOT              = 2
 	GA_ROOTOWNER         = 3
 
-	GWL_EXSTYLE int32 = -20
+	GWL_EXSTYLE int32    = -20
 	WS_EX_TOOLWINDOW     = 0x00000080
 	WS_EX_APPWINDOW      = 0x00040000
 
@@ -222,6 +222,8 @@ var monitors []MONITORINFO
 var makingChanges bool = false
 
 func setForeground(hwnd uintptr) {
+	println("SF")
+	
 	if hwnd == 0 {
 		return
 	}
@@ -544,12 +546,13 @@ func isInTree(hwnd uintptr, tree *treeNode) *treeNode {
 }
 
 func tryToSetActive(hwnd uintptr) {
+	println("TTSA")
+	
 	for mi, wss := range(data) {
 		for j, tree := range(wss.trees) {
 			if isInTree(hwnd, &tree) != nil {
 				wss.activeNodes[j] = hwnd
 				curMon = mi
-				setForeground(hwnd)
 				return
 			}
 		}
@@ -738,6 +741,7 @@ func windowDeleted(hwnd uintptr) bool {
 				if wss.activeNodes[ti] == hwnd {
 					wss.activeNodes[ti] = getNewActive(tree)
 					if (ti == curMon) {
+						println("WD")
 						setForeground(wss.activeNodes[ti])
 					}
 				}
@@ -910,6 +914,8 @@ func nextMonitor(hwnd uintptr) {
 	
 	windowDeleted(hwnd)
 	addToTree(hwnd, &data[curMon].trees[data[curMon].activeWorkspace], data[curMon].activeNodes[data[curMon].activeWorkspace], 2)
+	
+	println("NM")
 	setForeground(hwnd)
 	locate()
 }
@@ -958,6 +964,27 @@ func switchWindows(a, b uintptr) {
 			locate()
 		}
 	}
+}
+
+func moveWindowToWorkspace(hwnd uintptr, wi int) {
+	println("\n## Original Tree ##")
+	printTree(&data[curMon].trees[data[curMon].activeWorkspace], 1)
+	println("## Done Print ##\n")
+	
+	minimizeWindow(hwnd)
+	windowDeleted(hwnd)
+	
+	println("\n## Removed Tree ##")
+	printTree(&data[curMon].trees[data[curMon].activeWorkspace], 1)
+	println("## Done Print ##\n")
+	
+	addToTree(hwnd, &data[curMon].trees[wi], data[curMon].activeNodes[wi], 2)
+	
+	println("\n## Moved To ##")
+	printTree(&data[curMon].trees[wi], 1)
+	println("## Done Print ##\n")
+	
+	locate()
 }
 
 // Helper to check if a key is currently pressed down
@@ -1052,34 +1079,74 @@ func keyboardCallback(nCode int, wParam uintptr, lParam uintptr) uintptr {
 				}
 				return 1
 			case VK_0:
-				switchWorkspace(9)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 9)
+				}else if !isShift {
+					switchWorkspace(9)
+				}
 				return 1
 			case VK_1:
-				switchWorkspace(0)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 0)
+				}else if !isShift{
+					switchWorkspace(0)
+				}
 				return 1
 			case VK_2:
-				switchWorkspace(1)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 1)
+				}else if !isShift {
+					switchWorkspace(1)
+				}
 				return 1
 			case VK_3:
-				switchWorkspace(2)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 2)
+				}else if !isShift{
+					switchWorkspace(2)
+				}
 				return 1
 			case VK_4:
-				switchWorkspace(3)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 3)
+				}else if !isShift{
+					switchWorkspace(3)
+				}
 				return 1
 			case VK_5:
-				switchWorkspace(4)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 4)
+				}else if !isShift{
+					switchWorkspace(4)
+				}
 				return 1
 			case VK_6:
-				switchWorkspace(5)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 5)
+				}else if !isShift{
+					switchWorkspace(5)
+				}
 				return 1
 			case VK_7:
-				switchWorkspace(6)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 6)
+				}else if !isShift{
+					switchWorkspace(6)
+				}
 				return 1
 			case VK_8:
-				switchWorkspace(7)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 7)
+				}else if !isShift{
+					switchWorkspace(7)
+				}
 				return 1
 			case VK_9:
-				switchWorkspace(8)
+				if hwnd != 0 && isShift {
+					moveWindowToWorkspace(hwnd, 8)
+				}else if !isShift{
+					switchWorkspace(8)
+				}
 				return 1
 			}
 		}
