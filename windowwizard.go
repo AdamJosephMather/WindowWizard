@@ -14,6 +14,9 @@ import (
 var (
 	user32                  = windows.NewLazySystemDLL("user32.dll")
 	
+	procRegisterDeviceNotificationW = user32.NewProc("RegisterDeviceNotificationW")
+	procUnregisterDeviceNotification = user32.NewProc("UnregisterDeviceNotification")
+	
 	procSetWinEventHook     = user32.NewProc("SetWinEventHook")
 	procGetWindowTextW      = user32.NewProc("GetWindowTextW")
 	procIsWindowVisible     = user32.NewProc("IsWindowVisible")
@@ -113,6 +116,12 @@ const (
 	EVENT_SYSTEM_MINIMIZESTART  = 0x0016
 	EVENT_SYSTEM_MINIMIZEEND    = 0x0017
 	
+	WM_DEVICECHANGE = 0x0219
+	DBT_DEVICEARRIVAL = 0x8000
+	DBT_DEVICEREMOVECOMPLETE = 0x8004
+	DEVICE_NOTIFY_WINDOW_HANDLE = 0x00000000
+	DBT_DEVTYP_DEVICEINTERFACE = 0x00000005
+	
 	SWP_NOSIZE        = 0x0001
 	SWP_NOMOVE        = 0x0002
 	SWP_NOZORDER      = 0x0004
@@ -195,6 +204,28 @@ const (
 	WM_DESTROY = 0x0002
 )
 
+var guidDevInterfaceMonitor = windows.GUID{
+	Data1: 0xe6f07b5f,
+	Data2: 0xee97,
+	Data3: 0x4a90,
+	Data4: [8]byte{0xb0, 0x76, 0x33, 0xf5, 0x7a, 0x48, 0x8e, 0x54},
+}
+
+// New Structs
+type DEV_BROADCAST_HDR struct {
+	Dbch_size       uint32
+	Dbch_devicetype uint32
+	Dbch_reserved   uint32
+}
+
+type DEV_BROADCAST_DEVICEINTERFACE struct {
+	Dbch_size       uint32
+	Dbch_devicetype uint32
+	Dbch_reserved   uint32
+	Dbcc_classguid  windows.GUID
+	Dbcc_name       [1]uint16 // Placeholder for variable-length name
+}
+
 type WNDCLASSEX struct {
 	Size       uint32
 	Style      uint32
@@ -248,6 +279,26 @@ var trackingHWND uintptr = 0
 
 func overlayWndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 	switch msg {
+	case WM_DEVICECHANGE: // NEW CASE
+		// wparam holds the event type (e.g., arrival, removal)
+		if wparam == DBT_DEVICEARRIVAL || wparam == DBT_DEVICEREMOVECOMPLETE {
+			// lparam points to a header struct to check if it's the device we care about
+			hdr := (*DEV_BROADCAST_HDR)(unsafe.Pointer(lparam))
+
+			// Check if it's a device interface event
+			if hdr.Dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE {
+				devInterface := (*DEV_BROADCAST_DEVICEINTERFACE)(unsafe.Pointer(lparam))
+
+				// Check if it's the monitor GUID
+				if devInterface.Dbcc_classguid == guidDevInterfaceMonitor {
+					fmt.Println("Monitor added or removed!")
+					// Debounce this call, as you may get multiple messages
+					// For now, just call it directly:
+					onMonitorsChanged()
+				}
+			}
+		}
+		return 0
 	case WM_PAINT:
 		println("Paint")
 		
@@ -436,7 +487,7 @@ func setForeground(hwnd uintptr) {
 	procSetForegroundWindow.Call(hwnd)
 	procSetActiveWindow.Call(hwnd)
 	procSetFocus.Call(hwnd)
-
+	
 	// Detach again
 	if fgThread != 0 && curThread != 0 {
 		procAttachThreadInput.Call(curThread, fgThread, 0) // detach
@@ -449,7 +500,7 @@ func setForeground(hwnd uintptr) {
 func getExtendedFrameBounds(hwnd uintptr) (RECT, bool) {
 	var r RECT
 	rcb := uintptr(unsafe.Sizeof(r))
-
+	
 	hr, _, _ := procDwmGetWindowAttribute.Call(
 		hwnd,
 		uintptr(DWMWA_EXTENDED_FRAME_BOUNDS),
@@ -497,12 +548,12 @@ func minimizeWindow(hwnd uintptr) {
 func taskbarIsAutoHidden() bool {
 	var abd APPBARDATA
 	abd.CbSize = uint32(unsafe.Sizeof(abd))
-
+	
 	ret, _, _ := procSHAppBarMessage.Call(
 		uintptr(ABM_GETSTATE),
 		uintptr(unsafe.Pointer(&abd)),
 	)
-
+	
 	return (ret & ABS_AUTOHIDE) != 0
 }
 
@@ -583,12 +634,12 @@ func moveWindowToMonitor(hwnd uintptr, monitorIndex int, width, height int32) {
 	if monitorIndex < 0 || monitorIndex >= len(ms) {
 		return
 	}
-
+	
 	m := ms[monitorIndex].RcMonitor
-
+	
 	x := m.Left + (m.Right-m.Left-width)/2
 	y := m.Top + (m.Bottom-m.Top-height)/2
-
+	
 	moveResizeWindow(hwnd, x, y, width, height)
 }
 
@@ -613,7 +664,7 @@ func getWindowTitle(hwnd uintptr) string {
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(len(buf)),
 	)
-
+	
 	// Find null terminator
 	n := 0
 	for n < len(buf) && buf[n] != 0 {
@@ -628,12 +679,12 @@ func getWindowTitle(hwnd uintptr) string {
 func getWindowPlacement(hwnd uintptr) (showCmd uint32, ok bool) {
 	var wp WINDOWPLACEMENT
 	wp.Length = uint32(unsafe.Sizeof(wp))
-
+	
 	r, _, _ := procGetWindowPlacement.Call(
 		hwnd,
 		uintptr(unsafe.Pointer(&wp)),
 	)
-
+	
 	if r == 0 {
 		return 0, false
 	}
@@ -684,11 +735,11 @@ func enumDisplayMonitors() []MONITORINFO {
 	taskbars := getTaskbarRects()
 	keepem := !taskbarIsAutoHidden()
 	monitors = []MONITORINFO{}
-
+	
 	cb := syscall.NewCallback(func(hMonitor, hdc uintptr, lprc uintptr, lparam uintptr) uintptr {
 		var mi MONITORINFO
 		mi.CbSize = uint32(unsafe.Sizeof(mi))
-
+		
 		procGetMonitorInfoW.Call(
 			hMonitor,
 			uintptr(unsafe.Pointer(&mi)),
@@ -707,7 +758,7 @@ func enumDisplayMonitors() []MONITORINFO {
 		monitors = append(monitors, mi)
 		return 1 // continue enumeration
 	})
-
+	
 	procEnumDisplayMonitors.Call(0, 0, cb, 0)
 	return monitors
 }
@@ -916,10 +967,10 @@ func windowDeleted(hwnd uintptr) bool {
 	
 	for wi := range data {
 		wss := &data[wi] // pointer to the real workspace
-
+		
 		for ti := range wss.trees {
 			tree := &wss.trees[ti] // pointer to the real tree node
-
+			
 			if removeFromTree(hwnd, tree) {
 				foundit = true;
 				
@@ -983,8 +1034,6 @@ func drawTree(tree *treeNode, x, y, w, h int32) {
 		if (ok) {
 			drawTree(nd, cx, cy, cw, ch);
 		}
-		
-		
 		
 		cx += ax
 		cy += ay
@@ -1211,13 +1260,13 @@ func keyboardCallback(nCode int, wParam uintptr, lParam uintptr) uintptr {
 	if nCode < 0 {
 		return callNextHookEx(nCode, wParam, lParam)
 	}
-
+	
 	// We only care about key down events
 	if nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
 		// Cast lParam to our struct
 		kbd := (*KBDLLHOOKSTRUCT)(unsafe.Pointer(lParam))
 		vkCode := kbd.VkCode
-
+		
 		// Check if Right Alt is held down
 		if isKeyDown(VK_RMENU) {
 			
@@ -1556,7 +1605,7 @@ func onMonitorsChanged() {
 
 	for i, m := range ms {
 		fmt.Printf("Monitor %d: %+v\n", i, m.RcMonitor)
-
+		
 		ws := workSpaces{}
 		ws.trees = make([]treeNode, 10)
 		ws.activeNodes = make([]uintptr, 10)
@@ -1575,26 +1624,26 @@ func onMonitorsChanged() {
 
 func setupOverlay() {
 	instance := getHInstance()
-
+	
 	className, _ := syscall.UTF16PtrFromString("OverlayWindowClass")
-
+	
 	wndClass := WNDCLASSEX{
 		Size:     uint32(unsafe.Sizeof(WNDCLASSEX{})),
 		WndProc:  syscall.NewCallback(overlayWndProc),
 		Instance: instance,
 		ClassName: className,
 	}
-
+	
 	procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wndClass)))
-
+	
 	// Cover the virtual screen (all monitors)
 	x := getSystemMetric(SM_XVIRTUALSCREEN)
 	y := getSystemMetric(SM_YVIRTUALSCREEN)
 	w := getSystemMetric(SM_CXVIRTUALSCREEN)
 	h := getSystemMetric(SM_CYVIRTUALSCREEN)
-
+	
 	extStyle := WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_TRANSPARENT
-
+	
 	hwndRaw, _, _ := procCreateWindowExW.Call(
 		uintptr(extStyle),
 		uintptr(unsafe.Pointer(className)),
@@ -1607,7 +1656,7 @@ func setupOverlay() {
 		0, 0, uintptr(instance), 0,
 	)
 	overlayHWND = windows.Handle(hwndRaw)
-
+	
 	// Make the overlay fully opaque (from DWM's point of view),
 	// but still click-through because of WS_EX_TRANSPARENT.
 	// Make this color fully transparent
@@ -1617,9 +1666,20 @@ func setupOverlay() {
 		0,                        // alpha (ignored when using COLORKEY only)
 		LWA_COLORKEY,
 	)
-
+	
 	procShowWindow.Call(uintptr(overlayHWND), SW_SHOW)
 	procUpdateWindow.Call(uintptr(overlayHWND))
+	
+	var filter DEV_BROADCAST_DEVICEINTERFACE
+	filter.Dbch_size = uint32(unsafe.Sizeof(filter))
+	filter.Dbch_devicetype = DBT_DEVTYP_DEVICEINTERFACE
+	filter.Dbcc_classguid = guidDevInterfaceMonitor
+
+	procRegisterDeviceNotificationW.Call(
+		uintptr(overlayHWND),
+		uintptr(unsafe.Pointer(&filter)),
+		uintptr(DEVICE_NOTIFY_WINDOW_HANDLE),
+	)
 }
 
 func main() {
@@ -1678,7 +1738,7 @@ func main() {
 	
 	// start listening for more windows
 	cb := syscall.NewCallback(eventCallback)
-
+	
 	// We hook a range: CREATE..HIDE, and then filter inside.
 	// This gives us CREATE, DESTROY, SHOW, HIDE, but we only care about SHOW/DESTROY.
 	hook, _, err := procSetWinEventHook.Call(
