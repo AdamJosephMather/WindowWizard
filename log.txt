@@ -5,97 +5,177 @@ Inserting monitor 1 because it is new
 Inserting monitor 2 because it is new
 --- Enumerating Existing Windows ---
 Tracking Start: CodeWizard2 V2.3.3
-Tracking Start: ChatGPT - ProbablyFutile — Zen Browser
 --- Creating Keyboard Hook On VK 153 ---
 Recalc Monitor: 1 Group: 0
 Recalc Monitor: 2 Group: 0
 
 --- Monitoring Live Events (Press Ctrl+C to stop) ---
-H pressed
-Focus on: CodeWizard2 V2.3.3
-Focus change to CodeWizard2 V2.3.3
-H pressed
-Focus on: ChatGPT - ProbablyFutile — Zen Browser
-Focus change to ChatGPT - ProbablyFutile — Zen Browser
-L pressed
-Focus on: CodeWizard2 V2.3.3
-Focus change to CodeWizard2 V2.3.3
-I pressed
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Tracking Start: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
 Recalc Monitor: 1 Group: 0
-[Event] Display resolution/topology changed!
-Update monitor state
-Must destroy: 1 gotcha?
-Keeping: 2 mkay?
-Removing window: CodeWizard2 V2.3.3 because it's monitor was changed.
-Removing window: ChatGPT - ProbablyFutile — Zen Browser because it's monitor was changed.
-Removing monitor: 1
-Focus change to ChatGPT - ProbablyFutile — Zen Browser
-[Event] Monitor unplugged.
-Update monitor state
-Keeping: 2 mkay?
-Focus change to CodeWizard2 V2.3.3
-Minimized end: CodeWizard2 V2.3.3
-  Tracking: CodeWizard2 V2.3.3
-Tracking Start: CodeWizard2 V2.3.3
-Recalc Monitor: 2 Group: 0
-Focus on: CodeWizard2 V2.3.3
-[Event] Monitor plugged in.
-Update monitor state
-Must destroy: 2 gotcha?
-Removing window: CodeWizard2 V2.3.3 because it's monitor was changed.
-Removing monitor: 2
-Inserting monitor 3 because it is new
-Inserting monitor 4 because it is new
-[Event] Display resolution/topology changed!
-Update monitor state
-Must destroy: 3 gotcha?
-Must destroy: 4 gotcha?
-Removing monitor: 3
-Removing monitor: 4
-Inserting monitor 5 because it is new
-Inserting monitor 6 because it is new
-Minimized end: CodeWizard2 V2.3.3
-  Tracking: CodeWizard2 V2.3.3
-Tracking Start: CodeWizard2 V2.3.3
-Recalc Monitor: 5 Group: 0
-Focus on: CodeWizard2 V2.3.3
-Minimized end: ChatGPT - ProbablyFutile — Zen Browser
-  Tracking: ChatGPT - ProbablyFutile — Zen Browser
-Tracking Start: ChatGPT - ProbablyFutile — Zen Browser
-Recalc Monitor: 5 Group: 0
-Focus on: ChatGPT - ProbablyFutile — Zen Browser
-Tracking Stopped: CodeWizard2 V2.3.3
-Recalc Monitor: 5 Group: 0
-Focus change to ChatGPT - ProbablyFutile — Zen Browser
-I pressed
-Recalc Monitor: 5 Group: 0
-I pressed
-Recalc Monitor: 5 Group: 0
-W pressed
-Tracking Stopped: ChatGPT - ProbablyFutile — Zen Browser
-Recalc Monitor: 5 Group: 0
-Focus change to CodeWizard2 V2.3.3
-L pressed
-H pressed
-I pressed
-Focus change to CodeWizard2 V2.3.3
-Minimized end: CodeWizard2 V2.3.3
-  Tracking: CodeWizard2 V2.3.3
-Tracking Start: CodeWizard2 V2.3.3
-Recalc Monitor: 5 Group: 0
-Focus on: CodeWizard2 V2.3.3
-Focus change to ChatGPT - ProbablyFutile — Zen Browser
-Minimized end: ChatGPT - ProbablyFutile — Zen Browser
-  Tracking: ChatGPT - ProbablyFutile — Zen Browser
-Tracking Start: ChatGPT - ProbablyFutile — Zen Browser
-Recalc Monitor: 5 Group: 0
-Focus on: ChatGPT - ProbablyFutile — Zen Browser
-Focus change to CodeWizard2 V2.3.3
-Focus change to ChatGPT - ProbablyFutile — Zen Browser
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on nothing after group transition.
 Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
   Tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
 Tracking Start: Downloads (adamj\Downloads) - File Pilot v0.6.8
-Recalc Monitor: 5 Group: 0
+Recalc Monitor: 1 Group: 1
 Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
-Recalc Monitor: 5 Group: 0
-Recalc Monitor: 6 Group: 0
+Recalc Monitor: 1 Group: 0
+Focusing on: Downloads (adamj\Downloads) - File Pilot v0.6.8 after group transition.
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Focus change to CodeWizard2 V2.3.3
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Already tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser after group transition.
+Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Already tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 0
+Focusing on: Downloads (adamj\Downloads) - File Pilot v0.6.8 after group transition.
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to CodeWizard2 V2.3.3
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Already tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser after group transition.
+Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Already tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 0
+Focusing on: Downloads (adamj\Downloads) - File Pilot v0.6.8 after group transition.
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Focus change to CodeWizard2 V2.3.3
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Already tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser after group transition.
+Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Already tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 0
+Focusing on: Downloads (adamj\Downloads) - File Pilot v0.6.8 after group transition.
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to CodeWizard2 V2.3.3
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Already tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser after group transition.
+Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Already tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 0
+Focusing on: Downloads (adamj\Downloads) - File Pilot v0.6.8 after group transition.
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to CodeWizard2 V2.3.3
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Already tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser after group transition.
+Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Already tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 0
+Focusing on: Downloads (adamj\Downloads) - File Pilot v0.6.8 after group transition.
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Focus change to CodeWizard2 V2.3.3
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Already tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser after group transition.
+Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Already tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 0
+Focusing on: Downloads (adamj\Downloads) - File Pilot v0.6.8 after group transition.
+Focus on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Focus change to CodeWizard2 V2.3.3
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Focus change to Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Minimized end: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+  Already tracking: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser
+Recalc Monitor: 1 Group: 1
+Focusing on: Keyboard Ghosting and Shift Key Issues - Google Gemini — Zen Browser after group transition.
+Focus on: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Already tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Tracking Stopped: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 1
+Focus change to Downloads (adamj\Downloads) - File Pilot v0.6.8
+Focus change to CodeWizard2 V2.3.3
+Minimized end: CodeWizard2 V2.3.3
+  Already tracking: CodeWizard2 V2.3.3
+Recalc Monitor: 1 Group: 1
+Focus change to Task Manager
+Tracking Start: Task Manager
+Recalc Monitor: 1 Group: 1
+Focus on: Task Manager
+Tracking Stopped: Task Manager
+Recalc Monitor: 1 Group: 1
+Focus change to CodeWizard2 V2.3.3
+Focus change to Task Manager
+Minimized end: Task Manager
+  Tracking: Task Manager
+Tracking Start: Task Manager
+Recalc Monitor: 1 Group: 1
+Focus on: Task Manager
+Tracking Stopped: Task Manager
+Recalc Monitor: 1 Group: 1
+Focus change to CodeWizard2 V2.3.3
+Tracking Start: Save as?
+Recalc Monitor: 1 Group: 1
+Focus on: Save as?
+I pressed
+Recalc Monitor: 1 Group: 1
+I pressed
+Recalc Monitor: 1 Group: 1
+I pressed
+Recalc Monitor: 1 Group: 1
+I pressed
+Recalc Monitor: 1 Group: 1
+I pressed
+Recalc Monitor: 1 Group: 1
+I pressed
+Recalc Monitor: 1 Group: 1
+I pressed
+Recalc Monitor: 1 Group: 1
+I pressed
+Recalc Monitor: 1 Group: 1
+Closed: Save as?
+Recalc Monitor: 1 Group: 1
+Focus change to CodeWizard2 V2.3.3
+Minimized end: Downloads (adamj\Downloads) - File Pilot v0.6.8
+  Tracking: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Tracking Start: Downloads (adamj\Downloads) - File Pilot v0.6.8
+Recalc Monitor: 1 Group: 1

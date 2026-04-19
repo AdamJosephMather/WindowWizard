@@ -36,6 +36,7 @@ struct MonitorInfo {
 	int y;
 	int w;
 	int h;
+	int activeGroup;
 };
 
 struct MonitorData {
@@ -44,6 +45,7 @@ struct MonitorData {
 
 struct WindowInfo {
 	int monitor;
+	int group;
 	int x;
 	int y;
 	int w;
@@ -372,13 +374,13 @@ void ApplyManagedWindowRect(HWND hwnd, int x, int y, int w, int h) {
 	);
 }
 
-void recalc(int mon, HWND change = NULL, double amount = 1) {
+void recalc(int mon, int group, HWND change = NULL, double amount = 1) {
 	if (still_setting_up) {
 		return;
 	}
 	
 	// this recalculates positioning. Very important.
-	std::cout << "Recalc Monitor: " << mon << std::endl;
+	std::cout << "Recalc Monitor: " << mon << " Group: " << group << std::endl;
 	
 	auto it = monitors.find(mon);
 	if (it == monitors.end()) {
@@ -391,7 +393,7 @@ void recalc(int mon, HWND change = NULL, double amount = 1) {
 	double totalArea = 0;
 	
 	for (const std::pair<HWND,WindowInfo> pr : openWindows) {
-		if (pr.second.monitor == mon) {
+		if (pr.second.monitor == mon && pr.second.group == group) {
 			RECT rect;
 			double idealArea = 500*400; // good enough if we fail to get the rect?
 			if (GetWindowRect(pr.first, &rect)) {
@@ -491,9 +493,11 @@ void recalc(int mon, HWND change = NULL, double amount = 1) {
 void addToTracked(HWND hwnd) {
 	if (!monitors.empty()) {
 		int mon   = monitors.begin()->first;
+		int group = monitors.begin()->second.activeGroup;
 		
 		WindowInfo info = {
 			mon,
+			group,
 			0,
 			0,
 			600,
@@ -504,7 +508,17 @@ void addToTracked(HWND hwnd) {
 		char title[256];
 		GetWindowTextA(hwnd, title, sizeof(title));
 		std::cout << "Tracking Start: " << title << std::endl;
-		recalc(mon);
+		recalc(mon, group);
+	}
+}
+
+void switchGroupIfNeeded() {
+	for (auto mtrPair : monitors) {
+		int curGroup = mtrPair.second.activeGroup;
+		
+		for (auto wdwPair : openWindows) {
+			if ()
+		}
 	}
 }
 
@@ -542,17 +556,24 @@ void WindowCallback(HWND hwnd, WWActions action) {
 		int rclcGrp = 0;
 		
 		if (monIt != monitors.end()) {
-			needrecalc = true;
-			rclcMon = it->second.monitor;
+			if (it->second.group == monIt->second.activeGroup) {
+				needrecalc = true;
+				rclcMon = it->second.monitor;
+				rclcGrp = it->second.group;
+			}
 		}
 		
 		openWindows.erase(hwnd);
 		std::cout << "Closed: " << title << std::endl;
 		
 		if (needrecalc) {
-			recalc(rclcMon);
+			recalc(rclcMon, rclcGrp);
 		}
 	}else if (action == WW_MinEnd) {
+		// if this window is not being tracked already we'll place it on the first mon in the active group
+		// if it is being tracked and it's group is active, do nothing, it is where it needs to be.
+		// if it's being tracked and it's group isn't active, move it to the active group and recalc that group
+		
 		std::cout << "Minimized end: " << title << std::endl;
 		
 		if (!tracked) {
@@ -569,18 +590,34 @@ void WindowCallback(HWND hwnd, WWActions action) {
 			std::cout << "  Already tracking: " << title << std::endl;
 			
 			auto itMon = monitors.find(it->second.monitor);
-			if (itMon == monitors.end()) {
+			if (itMon != monitors.end()) {
+				bool groupActive = it->second.group == itMon->second.activeGroup;
+				
+				if (!groupActive) {
+					it->second.group = itMon->second.activeGroup;
+					recalc(itMon->first, itMon->second.activeGroup);
+				}
+			}else{
 				openWindows.erase(hwnd); // this window isn't on a monitor that we know of
 			}
 		}
 	}else if (action == WW_MinStart && tracked) {
+		// check if this window was part of the active group on it's monitor. If it was, we stop tracking it
 		auto monIt = monitors.find(it->second.monitor);
-		
-		openWindows.erase(hwnd);
-		std::cout << "Tracking Stopped: " << title << std::endl;
-		
+		bool stopTracking = false;
 		if (monIt != monitors.end()) {
-			recalc(monIt->first);
+			stopTracking = monIt->second.activeGroup == it->second.group;
+		}else{
+			stopTracking = true;
+		}
+		
+		if (stopTracking) {
+			openWindows.erase(hwnd);
+			std::cout << "Tracking Stopped: " << title << std::endl;
+			
+			if (monIt != monitors.end()) {
+				recalc(monIt->first, monIt->second.activeGroup);
+			}
 		}
 	}else if (action == WW_MoveSizeStart && tracked) {
 	}else if (action == WW_MoveSizeEnd && tracked) {
@@ -593,10 +630,11 @@ void WindowCallback(HWND hwnd, WWActions action) {
 			
 			if (rect.left != it->second.x || rect.top != it->second.y || height != it->second.h || width != it->second.w) {
 				int mon = it->second.monitor;
+				int group = it->second.group;
 				
 				openWindows.erase(hwnd);
 				std::cout << "Tracking Stopped: " << title << std::endl;
-				recalc(mon);
+				recalc(mon, group);
 			}
 		}
 	}else if (action == WW_Focus) {
@@ -632,6 +670,7 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 			monitorInfo.rcWork.top,
 			monitorInfo.rcWork.right-monitorInfo.rcWork.left,
 			monitorInfo.rcWork.bottom-monitorInfo.rcWork.top,
+			0 // active group ID
 		});
 	}
 	return TRUE;
@@ -823,7 +862,7 @@ void changeSize(double amount) {
 		return;
 	}
 	
-	recalc(it->second.monitor, focused, amount);
+	recalc(it->second.monitor, it->second.group, focused, amount);
 }
 
 std::pair<int,int> getDesired(RECT rect, int dx, int dy) {
@@ -853,7 +892,9 @@ HWND findWindow(int dx, int dy) {
 		for (std::pair<HWND, WindowInfo> pr : openWindows) {
 			auto it = monitors.find(pr.second.monitor);
 			if (it != monitors.end()) {
-				return pr.first;
+				if (it->second.activeGroup == pr.second.group) {
+					return pr.first;
+				}
 			}
 		}
 		return NULL;
@@ -876,6 +917,8 @@ HWND findWindow(int dx, int dy) {
 		
 		auto it = monitors.find(pr.second.monitor);
 		if (it == monitors.end()) continue;
+		
+		if (it->second.activeGroup != pr.second.group) continue;
 		
 		RECT rect;
 		if (!GetWindowRect(pr.first, &rect)) continue;
@@ -939,22 +982,56 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 				auto it = openWindows.find(focused);
 				if (it != openWindows.end()) {
 					auto itMon = monitors.find(it->second.monitor);
-					if (itMon != monitors.end()) {
+					if (itMon != monitors.end() && itMon->second.activeGroup == it->second.group) {
 						for (int i = 0; i < 10; i++) {
 							if (pKbdStruct->vkCode != numbers_in_char[i] || i >= idx_to_monitor_id.size()) continue;
 							
-							int oldMon = it->second.monitor;
-							
-							int newMon = idx_to_monitor_id[i];
-							auto itNewMon = monitors.find(newMon);
-							if (itNewMon == monitors.end()) {
-								continue;
+							if (isShiftPressed) { // move window to other monitor
+								int oldMon = it->second.monitor;
+								int oldGrp = it->second.group;
+								
+								int newMon = idx_to_monitor_id[i];
+								auto itNewMon = monitors.find(newMon);
+								if (itNewMon == monitors.end()) {
+									continue;
+								}
+								int newGroup = itNewMon->second.activeGroup;
+								
+								it->second.monitor = newMon;
+								it->second.group = newGroup;
+								
+								recalc(oldMon, oldGrp);
+								recalc(newMon, newGroup);
+							}else{ // otherwise we switch groups on the current monitor
+								if (i == itMon->second.activeGroup) {
+									continue;
+								}
+								
+								int oldGroup = itMon->second.activeGroup;
+								itMon->second.activeGroup = i;
+								HWND focusOn = NULL;
+								
+								for (auto pr : openWindows) {
+									if (pr.second.monitor == itMon->first && pr.second.group == oldGroup) {
+										ShowWindow(pr.first, SW_MINIMIZE); // hides all that are open in the current group
+									}else if (pr.second.monitor == itMon->first && pr.second.group == i) {
+										focusOn = pr.first;
+									}
+								}
+								
+								recalc(itMon->first, i);
+								
+								if (focusOn != NULL) {
+									char title[256];
+									GetWindowTextA(it->first, title, sizeof(title));
+									std::cout << "Focusing on: " << title << " after group transition.\n";
+								}else{
+									std::cout << "Focusing on nothing after group transition.\n";
+								}
+								focused = focusOn;
+								focus(focusOn);
+								repaint();
 							}
-							
-							it->second.monitor = newMon;
-							
-							recalc(oldMon);
-							recalc(newMon);
 							
 							break;
 						}
@@ -1035,7 +1112,7 @@ int main() {
 	still_setting_up = false;
 	
 	for (const std::pair<int, MonitorInfo>& pr : monitors) {
-		recalc(pr.first);
+		recalc(pr.first, pr.second.activeGroup);
 	}
 	
 	std::cout << "\n--- Monitoring Live Events (Press Ctrl+C to stop) ---" << std::endl;
