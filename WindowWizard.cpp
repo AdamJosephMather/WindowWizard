@@ -1,3 +1,4 @@
+#include <string>
 #include <windows.h>
 #include <iostream>
 #include <dwmapi.h>
@@ -75,33 +76,6 @@ bool still_setting_up = false;
 HWND g_overlay = NULL;
 std::vector<int> idx_to_monitor_id = {};
 
-void focus(HWND hwnd) {
-	if (hwnd == NULL) return;
-
-	char title[256];
-	GetWindowTextA(hwnd, title, sizeof(title));
-	std::cout << "Focus on: " << title << "\n";
-
-	DWORD currentThread    = GetCurrentThreadId();
-	DWORD targetThread     = GetWindowThreadProcessId(hwnd, NULL);
-	HWND  fgWnd            = GetForegroundWindow();
-	DWORD foregroundThread = GetWindowThreadProcessId(fgWnd, NULL);
-
-	// Bridge: current → foreground owner → target
-	if (foregroundThread != currentThread)
-		AttachThreadInput(currentThread, foregroundThread, TRUE);
-	if (targetThread != foregroundThread)
-		AttachThreadInput(foregroundThread, targetThread, TRUE);
-
-	SetForegroundWindow(hwnd);
-	BringWindowToTop(hwnd);
-
-	if (targetThread != foregroundThread)
-		AttachThreadInput(foregroundThread, targetThread, FALSE);
-	if (foregroundThread != currentThread)
-		AttachThreadInput(currentThread, foregroundThread, FALSE);
-}
-
 void DrawFocusedBorder(HWND hOverlay) {
 	PAINTSTRUCT ps;
 	HDC hdc = BeginPaint(hOverlay, &ps);
@@ -178,6 +152,33 @@ void repaint() {
 		InvalidateRect(g_overlay, NULL, TRUE);
 		UpdateWindow(g_overlay);
 	}
+}
+
+void focus(HWND hwnd) {
+	if (hwnd == NULL) return;
+
+	char title[256];
+	GetWindowTextA(hwnd, title, sizeof(title));
+	std::cout << "Focus on: " << title << "\n";
+
+	DWORD currentThread    = GetCurrentThreadId();
+	DWORD targetThread     = GetWindowThreadProcessId(hwnd, NULL);
+	HWND  fgWnd            = GetForegroundWindow();
+	DWORD foregroundThread = GetWindowThreadProcessId(fgWnd, NULL);
+
+	// Bridge: current → foreground owner → target
+	if (foregroundThread != currentThread)
+		AttachThreadInput(currentThread, foregroundThread, TRUE);
+	if (targetThread != foregroundThread)
+		AttachThreadInput(foregroundThread, targetThread, TRUE);
+
+	SetForegroundWindow(hwnd);
+	BringWindowToTop(hwnd);
+
+	if (targetThread != foregroundThread)
+		AttachThreadInput(foregroundThread, targetThread, FALSE);
+	if (foregroundThread != currentThread)
+		AttachThreadInput(currentThread, foregroundThread, FALSE);
 }
 
 bool HasExStyle(HWND hwnd, LONG_PTR flag) {
@@ -348,6 +349,31 @@ std::vector<Box> squarify(std::vector<AreaInfo> items, std::vector<AreaInfo> row
 	}
 }
 
+void ApplyManagedWindowRect(HWND hwnd, int x, int y, int w, int h) {
+	if (!IsWindow(hwnd)) return;
+
+	WINDOWPLACEMENT wp = {};
+	wp.length = sizeof(wp);
+
+	if (GetWindowPlacement(hwnd, &wp)) {
+		wp.rcNormalPosition = { x, y, x + w, y + h };
+
+		// Keep current show state unless minimized, where we want future restore
+		if (wp.showCmd == SW_SHOWMINIMIZED) {
+			wp.showCmd = SW_SHOWNORMAL;
+		}
+
+		SetWindowPlacement(hwnd, &wp);
+	}
+
+	SetWindowPos(
+		hwnd,
+		NULL,
+		x, y, w, h,
+		SWP_NOZORDER | SWP_NOACTIVATE
+	);
+}
+
 void recalc(int mon, int group, HWND change = NULL, double amount = 1) {
 	if (still_setting_up) {
 		return;
@@ -386,6 +412,7 @@ void recalc(int mon, int group, HWND change = NULL, double amount = 1) {
 	}
 	
 	if (areas.empty()) {
+		repaint();
 		return;
 	}
 	
@@ -437,7 +464,13 @@ void recalc(int mon, int group, HWND change = NULL, double amount = 1) {
 			itWin->second.w = w;
 			itWin->second.h = h;
 			
-			MoveWindow(b.hwnd, itWin->second.x, itWin->second.y, itWin->second.w, itWin->second.h, TRUE);
+			ApplyManagedWindowRect(
+				b.hwnd,
+				itWin->second.x,
+				itWin->second.y,
+				itWin->second.w,
+				itWin->second.h
+			);
 		}
 	}
 	
@@ -514,12 +547,16 @@ void WindowCallback(HWND hwnd, WWActions action) {
 			recalc(rclcMon, rclcGrp);
 		}
 	}else if (action == WW_MinEnd) {
-//		std::cout << "Restrd: " << title << std::endl;
 		// if this window is not being tracked already we'll place it on the first mon in the active group
 		// if it is being tracked and it's group is active, do nothing, it is where it needs to be.
 		// if it's being tracked and it's group isn't active, move it to the active group and recalc that group
 		
+		std::cout << "Minimized end: " << title << std::endl;
+		
 		if (!tracked) {
+			std::cout << "  Tracking: " << title << std::endl;
+			
+			ShowWindow(hwnd, SW_RESTORE);
 			addToTracked(hwnd);
 			if (!still_setting_up) {
 				focus(hwnd);
@@ -527,13 +564,15 @@ void WindowCallback(HWND hwnd, WWActions action) {
 				repaint();
 			}
 		}else{
+			std::cout << "  Already tracking: " << title << std::endl;
+			
 			auto itMon = monitors.find(it->second.monitor);
 			if (itMon != monitors.end()) {
 				bool groupActive = it->second.group == itMon->second.activeGroup;
 				
 				if (!groupActive) {
-					it->second.group = groupActive;
-					recalc(itMon->first, groupActive);
+					it->second.group = itMon->second.activeGroup;
+					recalc(itMon->first, itMon->second.activeGroup);
 				}
 			}else{
 				openWindows.erase(hwnd); // this window isn't on a monitor that we know of
@@ -558,7 +597,6 @@ void WindowCallback(HWND hwnd, WWActions action) {
 			}
 		}
 	}else if (action == WW_MoveSizeStart && tracked) {
-//		std::cout << "Moving: " << title << std::endl;
 	}else if (action == WW_MoveSizeEnd && tracked) {
 		// we will stop tracking if this window is no longer where we put it. And we will then recalc
 		
@@ -621,6 +659,8 @@ void UpdateMonitorState() {
 	
 	// now determine which monitors have changed, and minimize all windows associated with old monitors that no longer exist
 	
+	std::cout << "Update monitor state\n";
+	
 	std::vector<int> toremove = {};
 	for (const std::pair<int,MonitorInfo> pr : monitors) {
 		int oldId = pr.first;
@@ -637,12 +677,19 @@ void UpdateMonitorState() {
 		
 		if (!foundit) {
 			toremove.push_back(oldId);
+			std::cout << "Must destroy: " << oldId << " gotcha?\n";
+		}else{
+			std::cout << "Keeping: " << oldId << " mkay?\n";
 		}
 	}
 	
 	for (int id : toremove) {
 		// time to remove all windows from that monitor, and then minimize them
 		for (auto it = openWindows.begin(); it != openWindows.end(); ) {
+			char title[256];
+			GetWindowTextA(it->first, title, sizeof(title));
+			std::cout << "Removing window: " << title << " because it's monitor was changed.\n";
+			
 			if (it->second.monitor == id) {
 				HWND hTarget = it->first;
 				it = openWindows.erase(it); // important to erase first, don't want to have our other logic looking at it
@@ -652,6 +699,7 @@ void UpdateMonitorState() {
 			}
 		}
 		
+		std::cout << "Removing monitor: " << id << "\n";
 		monitors.erase(id);
 		for (int i = idx_to_monitor_id.size()-1; i >= 0; i--) {
 			if (idx_to_monitor_id[i] == id) {
@@ -677,6 +725,7 @@ void UpdateMonitorState() {
 		
 		if (!foundit) {
 			MONITOR_ID += 1;
+			std::cout << "Inserting monitor " << MONITOR_ID << " because it is new\n";
 			monitors.insert({MONITOR_ID, newMon});
 			idx_to_monitor_id.push_back(MONITOR_ID);
 		}
@@ -797,7 +846,7 @@ std::pair<int,int> getDesired(RECT rect, int dx, int dy) {
 	int desired_x;
 	if (dx == -1) {
 		desired_x = rect.left;
-	}else if (desired_x == 1){
+	}else if (dx == 1){
 		desired_x = rect.right;
 	}else{
 		desired_x = (rect.right+rect.left)/2;
@@ -806,7 +855,7 @@ std::pair<int,int> getDesired(RECT rect, int dx, int dy) {
 	int desired_y;
 	if (dy == -1) {
 		desired_y = rect.top;
-	}else if (desired_y == 1){
+	}else if (dy == 1){
 		desired_y = rect.bottom;
 	}else{
 		desired_y = (rect.bottom+rect.top)/2;
@@ -935,10 +984,34 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	return CallNextHookEx(hhkLowLevelKybd, nCode, wParam, lParam);
 }
 
+HWND CreateMessageWindow() {
+	WNDCLASSEX wc = { sizeof(WNDCLASSEX) };
+	wc.lpfnWndProc = MessageWindowProc;
+	wc.hInstance = GetModuleHandle(NULL);
+	wc.lpszClassName = TEXT("WWMessageWindowClass");
+
+	RegisterClassEx(&wc);
+
+	return CreateWindowEx(
+		0,
+		TEXT("WWMessageWindowClass"),
+		TEXT("WWMessageWindow"),
+		0,
+		0, 0, 0, 0,
+		NULL, NULL, wc.hInstance, NULL
+	);
+}
+
 int main() {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 	
 	still_setting_up = true;
+	
+	HWND hMsgWnd = CreateMessageWindow();
+	if (!hMsgWnd) {
+		std::cerr << "Failed to create message window!" << std::endl;
+		return 1;
+	}
 	
 	g_overlay = CreateOverlayWindow();
 	if (!g_overlay) {
@@ -946,7 +1019,7 @@ int main() {
 		return 1;
 	}
 	
-	RegisterMonitorNotifications(g_overlay);
+	RegisterMonitorNotifications(hMsgWnd);
 	
 	std::cout << "\n--- Enumerating Monitors ---" << std::endl;
 	
