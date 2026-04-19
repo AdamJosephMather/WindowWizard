@@ -470,6 +470,10 @@ void recalc(int mon, HWND change = NULL, double amount = 1) {
 				sizeof(RECT)
 			);
 			
+			if (!hr) {
+				trueRect = believed;
+			}
+			
 			itWin->second.x = b.x + it->second.x - (trueRect.left-believed.left);
 			itWin->second.y = b.y + it->second.y - (trueRect.top-believed.top);
 			itWin->second.w = w - ((trueRect.right-trueRect.left)-(believed.right-believed.left));
@@ -579,6 +583,11 @@ void WindowCallback(HWND hwnd, WWActions action) {
 		openWindows.erase(hwnd);
 		std::cout << "Tracking Stopped: " << title << std::endl;
 		
+		if (hwnd == focused) {
+			focused = NULL;
+			repaint();
+		}
+		
 		if (monIt != monitors.end()) {
 			recalc(monIt->first);
 		}
@@ -627,12 +636,18 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	
 	MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
 	if (GetMonitorInfo(hMonitor, &monitorInfo)) {
-		data->foundMonitors.push_back({
+		MonitorInfo mntr = {
 			monitorInfo.rcWork.left,
 			monitorInfo.rcWork.top,
 			monitorInfo.rcWork.right-monitorInfo.rcWork.left,
 			monitorInfo.rcWork.bottom-monitorInfo.rcWork.top,
-		});
+		};
+		
+		if (mntr.w == 0 || mntr.h == 0) {
+			return TRUE;
+		}
+		
+		data->foundMonitors.push_back(mntr);
 	}
 	return TRUE;
 }
@@ -869,7 +884,7 @@ HWND findWindow(int dx, int dy) {
 	// now find window that is closest
 	
 	HWND closest = NULL;
-	int maxDst;
+	long long maxDst;
 	
 	for (std::pair<HWND, WindowInfo> pr : openWindows) {
 		if (pr.first == focused) continue;
@@ -882,7 +897,7 @@ HWND findWindow(int dx, int dy) {
 		
 		std::pair<int,int> clst_x_clst_y = getDesired(rect, -dx, -dy);
 		
-		int dist = pow(clst_x_clst_y.first - des_x_des_y.first, 2) + pow(clst_x_clst_y.second - des_x_des_y.second, 2);
+		long long dist = pow((long long)(clst_x_clst_y.first - des_x_des_y.first), 2) + pow((long long)(clst_x_clst_y.second - des_x_des_y.second), 2);
 		
 		if (closest == NULL || dist < maxDst) {
 			maxDst = dist;
