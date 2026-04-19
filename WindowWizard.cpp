@@ -66,7 +66,7 @@ struct Box {
 std::unordered_map<HWND,WindowInfo> openWindows;
 std::unordered_map<int,MonitorInfo> monitors = {};
 int MONITOR_ID = 0;
-const int BORDER = 12;
+const int BORDER = 10;
 const int HALF_BORDER = BORDER/2;
 HWND focused = NULL;
 HHOOK hhkLowLevelKybd;
@@ -391,6 +391,12 @@ void recalc(int mon, HWND change = NULL, double amount = 1) {
 	double totalArea = 0;
 	
 	for (const std::pair<HWND,WindowInfo> pr : openWindows) {
+		if (!IsWindowVisible(pr.first)) {
+			openWindows.erase(pr.first);
+			recalc(mon, change, amount);
+			return;
+		}
+		
 		if (pr.second.monitor == mon) {
 			RECT rect;
 			double idealArea = 500*400; // good enough if we fail to get the rect?
