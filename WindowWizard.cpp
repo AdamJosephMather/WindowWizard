@@ -459,10 +459,23 @@ void recalc(int mon, int group, HWND change = NULL, double amount = 1) {
 		
 		auto itWin = openWindows.find(b.hwnd);
 		if (itWin != openWindows.end()) {
-			itWin->second.x = b.x + it->second.x;
-			itWin->second.y = b.y + it->second.y;
-			itWin->second.w = w;
-			itWin->second.h = h;
+			// we need to determine the offset required to turn GetWindowRect -> DWMWA_EXTENDED_FRAME_BOUNDS
+			
+			RECT believed;
+			GetWindowRect(b.hwnd, &believed);
+			
+			RECT trueRect;
+			HRESULT hr = DwmGetWindowAttribute(
+				b.hwnd,
+				DWMWA_EXTENDED_FRAME_BOUNDS,
+				&trueRect,
+				sizeof(RECT)
+			);
+			
+			itWin->second.x = b.x + it->second.x - (trueRect.left-believed.left);
+			itWin->second.y = b.y + it->second.y - (trueRect.top-believed.top);
+			itWin->second.w = w - ((trueRect.right-trueRect.left)-(believed.right-believed.left));
+			itWin->second.h = h - ((trueRect.bottom-trueRect.top)-(believed.bottom-believed.top));
 			
 			ApplyManagedWindowRect(
 				b.hwnd,
